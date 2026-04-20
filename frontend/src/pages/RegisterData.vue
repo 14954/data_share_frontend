@@ -5,8 +5,8 @@
         <div class="d-flex align-center mb-4">
           <v-icon size="40" color="primary" class="mr-3">mdi-upload</v-icon>
           <div>
-            <h1 class="text-h4 font-weight-bold">数据登记（S3 直传）</h1>
-            <p class="text-subtitle-1 text-grey mb-0">文件将直接上传到 S3，后端仅登记元数据</p>
+            <h1 class="text-h4 font-weight-bold">数据登记</h1>
+            <p class="text-subtitle-1 text-grey mb-0">可直接上传到后端，也可使用 S3 直传</p>
           </div>
         </div>
       </v-col>
@@ -30,16 +30,22 @@
 
               <v-divider class="my-4" />
 
-              <v-text-field v-model="region" label="Region" :rules="regionRules" required />
-              <v-text-field v-model="bucket" label="Bucket" :rules="bucketRules" required />
-              <v-text-field v-model="endpoint" label="Endpoint（可选）" :rules="endpointRules" />
+              <v-switch v-model="useS3Upload" color="primary" inset label="使用 S3 直传" />
 
-              <v-text-field v-model="accessKeyId" :type="showAccessKey ? 'text' : 'password'" label="Access Key ID" :append-icon="showAccessKey ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showAccessKey = !showAccessKey" :rules="accessKeyRules" required />
-              <v-text-field v-model="secretAccessKey" :type="showSecretKey ? 'text' : 'password'" label="Secret Access Key" :append-icon="showSecretKey ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showSecretKey = !showSecretKey" :rules="secretKeyRules" required />
-              <v-text-field v-model="sessionToken" label="Session Token" :append-icon="showSessionToken ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showSessionToken = !showSessionToken" :rules="sessionTokenRules" required />
+              <v-expand-transition>
+                <div v-if="useS3Upload">
+                  <v-text-field v-model="region" label="Region" :rules="regionRules" required />
+                  <v-text-field v-model="bucket" label="Bucket" :rules="bucketRules" required />
+                  <v-text-field v-model="endpoint" label="Endpoint（可选）" :rules="endpointRules" />
 
-              <v-textarea v-model="credentialJson" label="JSON 凭证（可粘贴 STS JSON 并解析）" rows="3" clearable />
-              <v-btn text small @click="parseCredentialJson">解析凭证</v-btn>
+                  <v-text-field v-model="accessKeyId" :type="showAccessKey ? 'text' : 'password'" label="Access Key ID" :append-icon="showAccessKey ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showAccessKey = !showAccessKey" :rules="accessKeyRules" required />
+                  <v-text-field v-model="secretAccessKey" :type="showSecretKey ? 'text' : 'password'" label="Secret Access Key" :append-icon="showSecretKey ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showSecretKey = !showSecretKey" :rules="secretKeyRules" required />
+                  <v-text-field v-model="sessionToken" label="Session Token" :append-icon="showSessionToken ? 'mdi-eye-off' : 'mdi-eye'" @click:append="showSessionToken = !showSessionToken" :rules="sessionTokenRules" required />
+
+                  <v-textarea v-model="credentialJson" label="JSON 凭证（可粘贴 STS JSON 并解析）" rows="3" clearable />
+                  <v-btn text small @click="parseCredentialJson">解析凭证</v-btn>
+                </div>
+              </v-expand-transition>
 
               <v-row class="mt-4" align="center">
                 <v-col cols="12" md="6">
@@ -81,6 +87,7 @@ const description = ref("");
 const domain = ref("general");
 const dataType = ref("csv");
 const file = ref(null);
+const useS3Upload = ref(false);
 
 const region = ref("");
 const bucket = ref("");
@@ -117,14 +124,16 @@ const domainRules = [(v) => !!v || "请输入专业领域"];
 const dataTypeRules = [(v) => !!v || "请选择数据类型"];
 const descriptionRules = [(v) => !!v || "请输入数据描述", (v) => (v && v.length >= 10) || "数据描述至少10个字符"];
 const fileRules = [(v) => !!v || "请选择文件", (v) => validateFile(v)];
-const regionRules = [(v) => !!v || "请输入 Region"];
-const bucketRules = [(v) => !!v || "请输入 Bucket"];
-const accessKeyRules = [(v) => !!v || "请输入 Access Key ID"];
-const secretKeyRules = [(v) => !!v || "请输入 Secret Access Key"];
-const sessionTokenRules = [(v) => !!v || "请输入 Session Token"];
+const requireWhenUsingS3 = (message) => (v) => !useS3Upload.value || !!v || message;
+const regionRules = [requireWhenUsingS3("请输入 Region")];
+const bucketRules = [requireWhenUsingS3("请输入 Bucket")];
+const accessKeyRules = [requireWhenUsingS3("请输入 Access Key ID")];
+const secretKeyRules = [requireWhenUsingS3("请输入 Secret Access Key")];
+const sessionTokenRules = [requireWhenUsingS3("请输入 Session Token")];
 const endpointRules = [(v) => !v || isValidHttpUrl(v) || "Endpoint 必须是 http/https 地址"];
 
-const canUpload = computed(() => valid.value && file.value && region.value.trim() && bucket.value.trim() && accessKeyId.value.trim() && secretAccessKey.value.trim() && sessionToken.value.trim() && !uploading.value);
+const hasS3Config = computed(() => region.value.trim() && bucket.value.trim() && accessKeyId.value.trim() && secretAccessKey.value.trim() && sessionToken.value.trim());
+const canUpload = computed(() => valid.value && file.value && (!useS3Upload.value || hasS3Config.value) && !uploading.value);
 const canResume = computed(() => !!pendingResume.value && uploadState.value === "failed");
 
 let s3ModuleRef = null;
@@ -158,6 +167,7 @@ const resetForm = () => {
   domain.value = "general";
   dataType.value = "csv";
   file.value = null;
+  useS3Upload.value = false;
   credentialJson.value = "";
   clearSensitiveCredentials();
   msg.value = err.value = "";
@@ -186,13 +196,17 @@ function isValidHttpUrl(u) {
 }
 
 function validateFile(selectedFile) {
-  const target = Array.isArray(selectedFile) ? selectedFile[0] : selectedFile;
+  const target = getSelectedFile(selectedFile);
   if (!target) return "请选择文件";
   if (target.size > MAX_FILE_SIZE) return `文件过大，最大允许 ${formatSize(MAX_FILE_SIZE)}`;
   const parts = String(target.name || "").split(".");
   const ext = parts.length > 1 ? parts.pop().toLowerCase() : "";
   if (!ALLOWED_EXTENSIONS.includes(ext)) return `不支持的文件类型，允许：${ALLOWED_EXTENSIONS.join(", ")}`;
   return true;
+}
+
+function getSelectedFile(selectedFile) {
+  return Array.isArray(selectedFile) ? selectedFile[0] : selectedFile;
 }
 
 function parseCredentialJson() {
@@ -228,7 +242,7 @@ const getS3Config = () => ({
 const getMetadataPayload = (uploaded, selectedFile) => ({
   // only include fields allowed by backend DatasetUploadIn schema
   name: name.value.trim(),
-  objectKey: uploaded.s3Key,
+  objectKey: uploaded?.s3Key,
   dataType: dataType.value || "file",
   description: description.value.trim() || "",
   domain: domain.value.trim() || "general",
@@ -293,6 +307,17 @@ const registerMetadata = async (uploaded, selectedFile, objectKey) => {
   }
 };
 
+const registerLocalFile = async (selectedFile) => {
+  const payloadObj = getMetadataPayload(null, selectedFile);
+  const form = new FormData();
+  Object.entries(payloadObj).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) form.append(k, String(v));
+  });
+  form.append("file", selectedFile);
+  const { data } = await api.post("/api/datasets/upload", form);
+  return data;
+};
+
 async function buildObjectKey(userId, originalName) {
   const m = await getS3Module();
   return m.buildS3ObjectKey(userId, originalName);
@@ -319,7 +344,25 @@ async function upload() {
   progressPercent.value = 0;
   speedText.value = etaText.value = "-";
 
-  const selectedFile = file.value;
+  const selectedFile = getSelectedFile(file.value);
+  if (!useS3Upload.value) {
+    uploadState.value = "registering";
+    progressPercent.value = 100;
+    try {
+      const data = await registerLocalFile(selectedFile);
+      uploadState.value = "done";
+      msg.value = `数据集 ID: ${data?.dataset?.id || "-"}（默认未上架，请前往“我的数据”进行上架）`;
+      file.value = null;
+    } catch (e) {
+      uploadState.value = "failed";
+      err.value = e?.response?.data?.message || e?.response?.data?.details || "上传登记失败";
+      showError.value = true;
+    } finally {
+      uploading.value = false;
+    }
+    return;
+  }
+
   const sanitizedName = await sanitizeFileNameSafe(selectedFile.name);
   const objectKey = await buildObjectKey(getUploadPrefixUserId(), sanitizedName);
   latestS3Key.value = objectKey;
