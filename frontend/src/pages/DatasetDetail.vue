@@ -130,14 +130,16 @@
 
         <v-dialog v-model="showRequestDialog" max-width="700">
           <v-card>
-            <v-card-title class="text-h6">输入公钥以请求共享</v-card-title>
+            <v-card-title class="text-h6">请描述你的请求</v-card-title>
             <v-card-text>
               <v-form>
                 <v-textarea
-                  v-model="publicKey"
-                  label="公钥 (publicKey)"
-                  placeholder="在此粘贴您的公钥"
+                  v-model="requestMessage"
+                  label="请求说明"
+                  placeholder="请说明你的使用场景或申请原因"
                   rows="6"
+                  counter="500"
+                  maxlength="500"
                 />
               </v-form>
             </v-card-text>
@@ -213,7 +215,7 @@ const loading = ref(false);
 const requesting = ref(false);
 const showError = ref(false);
 const showRequestDialog = ref(false);
-const publicKey = ref("");
+const requestMessage = ref("");
 const pendingDatasetId = ref(null);
 
 const previewText = computed(() => previewLines.value.join("\n"));
@@ -269,15 +271,15 @@ async function load() {
 // }
 
 function requestShare(datasetId) {
-  // 打开弹窗，输入公钥后再提交
   pendingDatasetId.value = datasetId;
-  publicKey.value = "";
+  requestMessage.value = "";
   showRequestDialog.value = true;
 }
 
 async function submitRequest() {
-  if (!publicKey.value || !publicKey.value.trim()) {
-    err.value = "请输入公钥";
+  const message = requestMessage.value.trim();
+  if (!message) {
+    err.value = "请描述你的请求";
     showError.value = true;
     return;
   }
@@ -285,8 +287,7 @@ async function submitRequest() {
   try {
     await api.post("/api/shares/requests", {
       datasetId: pendingDatasetId.value,
-      message: "我需要用于研究/课程项目",
-      publicKey: publicKey.value,
+      message,
     });
     showRequestDialog.value = false;
     // 可选：显示成功提示
