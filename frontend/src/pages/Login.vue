@@ -130,7 +130,7 @@ async function register() {
   err.value = "";
   loading.value = true;
   try {
-    await api.post("/api/auth/register", {
+    await api.post("/remote/auth/register", {
       username: username.value,
       password: password.value,
     });
@@ -149,7 +149,7 @@ async function login() {
   err.value = "";
   loading.value = true;
   try {
-    const { data } = await api.post("/api/auth/login", {
+    const { data } = await api.post("/remote/auth/login", {
       username: username.value,
       password: password.value,
     });

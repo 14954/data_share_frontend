@@ -259,7 +259,7 @@ const regenerateToken = async () => {
     // 调用后端API重新生成Token
     // 注意：如果后端没有这个接口，这里会失败
     // 可以先注释掉，只提示用户需要重新登录
-    const { data } = await api.post("/api/auth/regenerate-token");
+    const { data } = await api.post("/remote/auth/regenerate-token");
     
     // 更新Token
     auth.setAuth(data.token, auth.user);

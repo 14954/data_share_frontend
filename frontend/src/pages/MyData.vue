@@ -386,7 +386,7 @@ const downloading = ref(false);
 
 // 我的共享
 async function fetchSharing() {
-  const { data } = await api.get("/api/shares/sharing-with-others");
+  const { data } = await api.get("/remote/shares/sharing-with-others");
   sharings.value = (data.sharing || []).map(x => ({
     ...x,
     _busy: false,
@@ -397,7 +397,7 @@ async function decide(r, statusBool) {
   const newStatus = statusBool ? 'approved' : 'rejected';
   try {
     // 后端 update API 期望字段名为 isApproved
-    await api.patch(`/api/shares/${r.id}`, { isApproved: statusBool });
+    await api.patch(`/remote/shares/${r.id}`, { isApproved: statusBool });
     // 本地更新状态以即时反馈
     r.status = newStatus;
     r.isShared = statusBool;
@@ -413,7 +413,7 @@ onMounted(fetchSharing);
 
 //共享给我的
 async function fetchSharedWithMe() {
-  const { data } = await api.get("/api/shares/shared-with-me");
+  const { data } = await api.get("/remote/shares/shared-with-me");
   shareds.value = (data.shared || []).map(x => ({ ...x }));
   downloading.value = false;
 }
@@ -470,7 +470,7 @@ async function download(r) {
     }
 
     if (storageType === "local") {
-      const resp = await api.get(`/api/datasets/${datasetId}/download`, {
+      const resp = await api.get(`/remote/datasets/${datasetId}/download`, {
         responseType: "blob",
       });
       const headerFileName = parseDownloadFileName(resp.headers?.["content-disposition"]);
@@ -478,7 +478,7 @@ async function download(r) {
       return;
     }
 
-    const { data } = await api.get(`/api/datasets/${datasetId}/download-url`);
+    const { data } = await api.get(`/remote/datasets/${datasetId}/download-url`);
     const downloadUrl = data?.downloadUrl;
     if (!downloadUrl) {
       throw new Error("下载链接无效");
@@ -497,7 +497,7 @@ onMounted(fetchSharedWithMe);
 // 我发起的请求
 async function fetchRequestsByMe() {
   try {
-    const { data } = await api.get('/api/shares/requests-by-me');
+    const { data } = await api.get('/remote/shares/requests-by-me');
     // 后端返回 { requests: [...] }
     requestsByMe.value = (data.requests || []).map(x => ({
       ...x,
@@ -515,7 +515,7 @@ async function load() {
   err.value = "";
   loading.value = true;
   try {
-    const { data } = await api.get("/api/datasets/mine");
+    const { data } = await api.get("/remote/datasets/mine");
     owned.value = (data.owned || []).map((item) => ({
       ...item,
       updating: false,
@@ -531,7 +531,7 @@ async function load() {
 async function toggle(d, isListed) {
   d.updating = true;
   try {
-    const { data } = await api.patch(`/api/datasets/${d.id}/listing`, {
+    const { data } = await api.patch(`/remote/datasets/${d.id}/listing`, {
       isListed,
     });
     d.isListed = data.dataset.isListed;

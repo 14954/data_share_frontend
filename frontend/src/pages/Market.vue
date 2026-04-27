@@ -181,7 +181,7 @@ async function load() {
     if (domain.value) params.domain = domain.value;
     if (sort.value && sort.value !== "new") params.sort = sort.value;
 
-    const { data } = await api.get("/api/datasets/market", { params });
+    const { data } = await api.get("/remote/datasets/market", { params });
     list.value = data.list || [];
   } catch (e) {
     err.value = e?.response?.data?.message || "加载失败";

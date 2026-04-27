@@ -294,7 +294,7 @@ const registerMetadata = async (uploaded, selectedFile, objectKey) => {
       if (v !== undefined && v !== null) form.append(k, String(v));
     });
     // let axios set the multipart boundary header automatically
-    const { data } = await api.post("/api/datasets/upload", form);
+    const { data } = await api.post("/remote/datasets/upload", form);
     return { ok: true, data };
   } catch (e) {
     try {
@@ -314,7 +314,7 @@ const registerLocalFile = async (selectedFile) => {
     if (v !== undefined && v !== null) form.append(k, String(v));
   });
   form.append("file", selectedFile);
-  const { data } = await api.post("/api/datasets/upload", form);
+  const { data } = await api.post("/remote/datasets/upload", form);
   return data;
 };
 

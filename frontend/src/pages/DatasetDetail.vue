@@ -237,7 +237,7 @@ async function load() {
   err.value = "";
   loading.value = true;
   try {
-    const { data } = await api.get(`/api/datasets/${route.params.id}`);
+    const { data } = await api.get(`/remote/datasets/${route.params.id}`);
     dataset.value = data.dataset;
     previewLines.value = data.previewLines || [];
   } catch (e) {
@@ -285,7 +285,7 @@ async function submitRequest() {
   }
   requesting.value = true;
   try {
-    await api.post("/api/shares/requests", {
+    await api.post("/remote/shares/requests", {
       datasetId: pendingDatasetId.value,
       message,
     });
