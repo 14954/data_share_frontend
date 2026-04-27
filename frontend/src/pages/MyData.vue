@@ -225,6 +225,58 @@
       </v-overlay>
     </v-card>
 
+    <v-dialog v-model="showApproveDialog" max-width="760">
+      <v-card>
+        <v-card-title class="bg-primary text-white">生成临时下载链接</v-card-title>
+        <v-card-text class="pa-6">
+          <v-text-field v-model="approveRegion" label="Region" :rules="approveRegionRules" required />
+          <v-text-field v-model="approveBucket" label="Bucket" :rules="approveBucketRules" required />
+          <v-text-field v-model="approveEndpoint" label="Endpoint（可选）" :rules="approveEndpointRules" />
+          <v-text-field
+            v-model="approveAccessKeyId"
+            :type="showApproveAccessKey ? 'text' : 'password'"
+            label="Access Key ID"
+            :append-icon="showApproveAccessKey ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append="showApproveAccessKey = !showApproveAccessKey"
+            :rules="approveAccessKeyRules"
+            required
+          />
+          <v-text-field
+            v-model="approveSecretAccessKey"
+            :type="showApproveSecretKey ? 'text' : 'password'"
+            label="Secret Access Key"
+            :append-icon="showApproveSecretKey ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append="showApproveSecretKey = !showApproveSecretKey"
+            :rules="approveSecretKeyRules"
+            required
+          />
+          <v-text-field
+            v-model="approveSessionToken"
+            :type="showApproveSessionToken ? 'text' : 'password'"
+            label="Session Token"
+            :append-icon="showApproveSessionToken ? 'mdi-eye-off' : 'mdi-eye'"
+            @click:append="showApproveSessionToken = !showApproveSessionToken"
+            :rules="approveSessionTokenRules"
+            required
+          />
+          <v-textarea
+            v-model="approveCredentialJson"
+            label="JSON 凭证（可粘贴 STS JSON 并解析）"
+            rows="3"
+            clearable
+          />
+          <v-btn variant="text" size="small" @click="parseApproveCredentialJson">解析凭证</v-btn>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closeApproveDialog">取消</v-btn>
+          <v-btn color="primary" :loading="approveSubmitting" :disabled="!canSubmitApproval" @click="confirmGenerateUrl">
+            确认生成临时下载链接
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
 <!-- 3.共享给我的数据 -->
     <v-card class="mb-6" elevation="2">
       <v-card-title class="bg-primary text-white d-flex align-center">
@@ -372,8 +424,10 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { api } from "../api";
+
+const APPROVE_PREF_KEY = "myData.shareApprove.s3.publicPrefs";
 
 const owned = ref([]);
 const err = ref("");
@@ -383,8 +437,142 @@ const sharings = ref([]);
 const shareds = ref([]);
 const requestsByMe = ref([]);
 const downloading = ref(false);
+const showApproveDialog = ref(false);
+const approveSubmitting = ref(false);
+const pendingShare = ref(null);
+const approveRegion = ref("");
+const approveBucket = ref("");
+const approveEndpoint = ref("");
+const approveAccessKeyId = ref("");
+const approveSecretAccessKey = ref("");
+const approveSessionToken = ref("");
+const approveCredentialJson = ref("");
+const showApproveAccessKey = ref(false);
+const showApproveSecretKey = ref(false);
+const showApproveSessionToken = ref(false);
 
-// 我的共享
+const approveRegionRules = [(v) => !!String(v || "").trim() || "请输入 Region"];
+const approveBucketRules = [(v) => !!String(v || "").trim() || "请输入 Bucket"];
+const approveAccessKeyRules = [(v) => !!String(v || "").trim() || "请输入 Access Key ID"];
+const approveSecretKeyRules = [(v) => !!String(v || "").trim() || "请输入 Secret Access Key"];
+const approveSessionTokenRules = [(v) => !!String(v || "").trim() || "请输入 Session Token"];
+const approveEndpointRules = [(v) => !v || isValidHttpUrl(v) || "Endpoint 必须是 http/https 地址"];
+const canSubmitApproval = computed(() =>
+  !!pendingShare.value
+  && !!approveRegion.value.trim()
+  && !!approveBucket.value.trim()
+  && !!approveAccessKeyId.value.trim()
+  && !!approveSecretAccessKey.value.trim()
+  && !!approveSessionToken.value.trim()
+  && !approveSubmitting.value
+);
+
+function isValidHttpUrl(u) {
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function loadApprovePrefs() {
+  try {
+    const raw = localStorage.getItem(APPROVE_PREF_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    approveRegion.value = p.region || "";
+    approveBucket.value = p.bucket || "";
+    approveEndpoint.value = p.endpoint || "";
+  } catch {
+    localStorage.removeItem(APPROVE_PREF_KEY);
+  }
+}
+
+function persistApprovePrefs() {
+  localStorage.setItem(APPROVE_PREF_KEY, JSON.stringify({
+    region: approveRegion.value.trim(),
+    bucket: approveBucket.value.trim(),
+    endpoint: approveEndpoint.value.trim(),
+  }));
+}
+
+function clearApproveCredentials() {
+  approveAccessKeyId.value = "";
+  approveSecretAccessKey.value = "";
+  approveSessionToken.value = "";
+  approveCredentialJson.value = "";
+  showApproveAccessKey.value = false;
+  showApproveSecretKey.value = false;
+  showApproveSessionToken.value = false;
+}
+
+function closeApproveDialog() {
+  showApproveDialog.value = false;
+  pendingShare.value = null;
+  clearApproveCredentials();
+}
+
+function parseApproveCredentialJson() {
+  if (!approveCredentialJson.value.trim()) {
+    err.value = "请输入 JSON 凭证内容";
+    showError.value = true;
+    return;
+  }
+  try {
+    const parsed = JSON.parse(approveCredentialJson.value);
+    const accessV = parsed.accessKeyId || parsed.AccessKeyId || parsed.aws_access_key_id;
+    const secretV = parsed.secretAccessKey || parsed.SecretAccessKey || parsed.aws_secret_access_key;
+    const tokenV = parsed.sessionToken || parsed.SessionToken || parsed.Token || parsed.aws_session_token;
+    if (!accessV || !secretV || !tokenV) {
+      throw new Error("JSON 缺少必要字段：accessKeyId、secretAccessKey、sessionToken");
+    }
+    approveAccessKeyId.value = String(accessV).trim();
+    approveSecretAccessKey.value = String(secretV).trim();
+    approveSessionToken.value = String(tokenV).trim();
+    err.value = "";
+    showError.value = false;
+  } catch (e) {
+    err.value = e?.message || "JSON 解析失败";
+    showError.value = true;
+  }
+}
+
+function openApproveDialog(sharing) {
+  pendingShare.value = sharing;
+  approveSubmitting.value = false;
+  clearApproveCredentials();
+  showApproveDialog.value = true;
+}
+
+async function confirmGenerateUrl() {
+  if (!canSubmitApproval.value) return;
+  approveSubmitting.value = true;
+  try {
+    persistApprovePrefs();
+    const { data } = await api.post("/local/generate_url", {
+      shareId: pendingShare.value.id,
+      objectKey: pendingShare.value.objectKey,
+      bucket: approveBucket.value.trim(),
+      access_key_id: approveAccessKeyId.value.trim(),
+      secret_access_key: approveSecretAccessKey.value.trim(),
+      session_token: approveSessionToken.value.trim(),
+      region: approveRegion.value.trim(),
+      endpoint: approveEndpoint.value.trim() || undefined,
+    });
+    pendingShare.value.status = "approved";
+    pendingShare.value.signedUrl = data?.signed_url || "";
+    showApproveDialog.value = false;
+    clearApproveCredentials();
+    pendingShare.value = null;
+  } catch (e) {
+    err.value = e?.response?.data?.details || e?.response?.data?.message || "生成临时下载链接失败";
+    showError.value = true;
+  } finally {
+    approveSubmitting.value = false;
+  }
+}
+
 async function fetchSharing() {
   const { data } = await api.get("/remote/shares/sharing-with-others");
   sharings.value = (data.sharing || []).map(x => ({
@@ -392,15 +580,16 @@ async function fetchSharing() {
     _busy: false,
   }));
 }
+
 async function decide(r, statusBool) {
+  if (statusBool) {
+    openApproveDialog(r);
+    return;
+  }
   r._busy = true;
-  const newStatus = statusBool ? 'approved' : 'rejected';
   try {
-    // 后端 update API 期望字段名为 isApproved
-    await api.patch(`/remote/shares/${r.id}`, { isApproved: statusBool });
-    // 本地更新状态以即时反馈
-    r.status = newStatus;
-    r.isShared = statusBool;
+    await api.post("/remote/shares/reject", { shareId: r.id });
+    r.status = "rejected";
     r.responded_at = new Date().toISOString();
   } catch (e) {
     err.value = e?.response?.data?.message || "操作失败";
@@ -411,7 +600,6 @@ async function decide(r, statusBool) {
 }
 onMounted(fetchSharing);
 
-//共享给我的
 async function fetchSharedWithMe() {
   const { data } = await api.get("/remote/shares/shared-with-me");
   shareds.value = (data.shared || []).map(x => ({ ...x }));
@@ -478,6 +666,12 @@ async function download(r) {
       return;
     }
 
+    const inlineSignedUrl = r?.signedUrl || r?.signed_url;
+    if (inlineSignedUrl) {
+      window.open(inlineSignedUrl, "_blank", "noopener");
+      return;
+    }
+
     const { data } = await api.get(`/remote/datasets/${datasetId}/download-url`);
     const downloadUrl = data?.downloadUrl;
     if (!downloadUrl) {
@@ -494,22 +688,18 @@ async function download(r) {
 }
 onMounted(fetchSharedWithMe);
 
-// 我发起的请求
 async function fetchRequestsByMe() {
   try {
     const { data } = await api.get('/remote/shares/requests-by-me');
-    // 后端返回 { requests: [...] }
     requestsByMe.value = (data.requests || []).map(x => ({
       ...x,
       status: x.status,
     }));
   } catch (e) {
-    // 非阻塞性错误
     console.error('fetchRequestsByMe error', e);
   }
 }
 onMounted(fetchRequestsByMe);
-
 
 async function load() {
   err.value = "";
@@ -548,5 +738,10 @@ watch(showError, (val) => {
   if (!val) err.value = "";
 });
 
+watch([approveRegion, approveBucket, approveEndpoint], () => {
+  persistApprovePrefs();
+});
+
+loadApprovePrefs();
 onMounted(load);
 </script>
