@@ -59,7 +59,7 @@
                     <v-list-item-title>数据提供者</v-list-item-title>
                     <v-list-item-subtitle>
                       <v-chip color="info" variant="tonal">
-                        {{ dataset.ownerName }}
+                        {{ ownerDisplay }}
                       </v-chip>
                     </v-list-item-subtitle>
                   </v-list-item>
@@ -82,7 +82,7 @@
                     <v-list-item-title>数据类型</v-list-item-title>
                     <v-list-item-subtitle>
                       <v-chip color="warning" variant="tonal">
-                        {{ dataset.dataType }}
+                        {{ dataset.data_type }}
                       </v-chip>
                     </v-list-item-subtitle>
                   </v-list-item>
@@ -105,7 +105,7 @@
                     </template>
                     <v-list-item-title>文件大小</v-list-item-title>
                     <v-list-item-subtitle>
-                      {{ formatSize(dataset.fileSize) }}
+                      {{ formatSize(dataset.file_size) }}
                     </v-list-item-subtitle>
                   </v-list-item>
                 </v-list>
@@ -219,6 +219,10 @@ const requestMessage = ref("");
 const pendingDatasetId = ref(null);
 
 const previewText = computed(() => previewLines.value.join("\n"));
+const ownerDisplay = computed(() => {
+  if (!dataset.value) return "-";
+  return dataset.value.ownerName || dataset.value.owner_id || "-";
+});
 
 // const breadcrumbs = computed(() => [
 //   { title: "数据市场", to: "/market", disabled: false },
