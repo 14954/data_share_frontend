@@ -371,18 +371,6 @@
                 {{ req.status === 'approved' ? '已共享' : (req.status === 'rejected' ? '已拒绝' : '待处理') }}
               </v-chip>
 
-              <v-btn
-                v-if="req.status === 'approved'"
-                color="primary"
-                variant="tonal"
-                size="small"
-                class="ml-2"
-                :loading="downloading"
-                @click="download(req)"
-              >
-                <v-icon start>mdi-download</v-icon>
-                下载
-              </v-btn>
             </template>
           </v-list-item>
         </v-list>
