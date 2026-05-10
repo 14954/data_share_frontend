@@ -277,6 +277,22 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="showLocalApproveDialog" max-width="520">
+      <v-card>
+        <v-card-title class="bg-primary text-white">批准共享请求</v-card-title>
+        <v-card-text class="pa-6 text-body-1">
+          本文件副本存储在数据市场中，是否批准
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closeLocalApproveDialog">取消</v-btn>
+          <v-btn color="primary" :loading="localApproveSubmitting" @click="confirmLocalApprove">
+            批准
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
 <!-- 3.共享给我的数据 -->
     <v-card class="mb-6" elevation="2">
       <v-card-title class="bg-primary text-white d-flex align-center">
@@ -426,7 +442,9 @@ const shareds = ref([]);
 const requestsByMe = ref([]);
 const downloading = ref(false);
 const showApproveDialog = ref(false);
+const showLocalApproveDialog = ref(false);
 const approveSubmitting = ref(false);
+const localApproveSubmitting = ref(false);
 const pendingShare = ref(null);
 const approveRegion = ref("");
 const approveBucket = ref("");
@@ -501,6 +519,17 @@ function closeApproveDialog() {
   clearApproveCredentials();
 }
 
+function openLocalApproveDialog(sharing) {
+  pendingShare.value = sharing;
+  localApproveSubmitting.value = false;
+  showLocalApproveDialog.value = true;
+}
+
+function closeLocalApproveDialog() {
+  showLocalApproveDialog.value = false;
+  pendingShare.value = null;
+}
+
 function parseApproveCredentialJson() {
   if (!approveCredentialJson.value.trim()) {
     err.value = "请输入 JSON 凭证内容";
@@ -561,6 +590,26 @@ async function confirmGenerateUrl() {
   }
 }
 
+async function confirmLocalApprove() {
+  if (!pendingShare.value || localApproveSubmitting.value) return;
+  localApproveSubmitting.value = true;
+  try {
+    await api.post("/remote/shares/update", {
+      shareId: pendingShare.value.id,
+      storageType: "local",
+    });
+    pendingShare.value.status = "approved";
+    pendingShare.value.responded_at = new Date().toISOString();
+    showLocalApproveDialog.value = false;
+    pendingShare.value = null;
+  } catch (e) {
+    err.value = e?.response?.data?.details || e?.response?.data?.message || "批准共享请求失败";
+    showError.value = true;
+  } finally {
+    localApproveSubmitting.value = false;
+  }
+}
+
 async function fetchSharing() {
   const { data } = await api.get("/remote/shares/sharing-with-others");
   sharings.value = (data.sharing || []).map(x => ({
@@ -571,7 +620,17 @@ async function fetchSharing() {
 
 async function decide(r, statusBool) {
   if (statusBool) {
-    openApproveDialog(r);
+    const storageType = normalizeStorageType(r);
+    if (storageType === "local") {
+      openLocalApproveDialog(r);
+      return;
+    }
+    if (storageType === "s3") {
+      openApproveDialog(r);
+      return;
+    }
+    err.value = "缺少 storageType，无法判断批准方式";
+    showError.value = true;
     return;
   }
   r._busy = true;
