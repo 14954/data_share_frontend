@@ -58,8 +58,8 @@ const router = useRouter();
 const menuItems = [
   { id_name: "market", title: "数据市场", icon: "mdi-store" },
   { id_name: "register-data", title: "数据登记", icon: "mdi-upload" },
-  { id_name: "my", title: "我的数据", icon: "mdi-folder-account" },
-  { id_name: "account", title: "我的账户", icon: "mdi-account-cog" },
+  { id_name: "my", title: "数据管理", icon: "mdi-folder-account" },
+  { id_name: "account", title: "个人中心", icon: "mdi-account-cog" },
 ];
 
 // 移动端适配
