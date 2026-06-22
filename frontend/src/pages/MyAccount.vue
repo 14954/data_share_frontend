@@ -6,7 +6,7 @@
         <div class="d-flex align-center mb-4">
           <v-icon size="40" color="primary" class="mr-3">mdi-account-circle</v-icon>
           <div>
-            <h1 class="text-h4 font-weight-bold">我的账户</h1>
+            <h1 class="text-h4 font-weight-bold">个人中心</h1>
             <p class="text-subtitle-1 text-grey mb-0">管理您的账户信息和API Token</p>
           </div>
         </div>

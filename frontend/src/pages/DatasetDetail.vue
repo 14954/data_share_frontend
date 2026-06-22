@@ -40,8 +40,8 @@
       <v-col cols="12">
         <!-- 数据集标题卡片 -->
         <v-card class="mb-6" elevation="3">
-          <v-card-title class="text-h4 pa-6 bg-gradient">
-            <v-icon size="48" class="mr-3" color="primary"
+          <v-card-title class="text-h5 pa-3 bg-gradient">
+            <v-icon size="36" class="mr-3" color="primary"
               >mdi-file-document</v-icon
             >
             {{ dataset.name }}
@@ -51,7 +51,7 @@
             <v-row>
               <v-col cols="12" md="8">
                 <!-- 数据集信息 -->
-                <v-list lines="two" class="transparent">
+                <v-list lines="one" class="transparent">
                   <v-list-item>
                     <template v-slot:prepend>
                       <v-icon color="info">mdi-tag</v-icon>
@@ -159,7 +159,7 @@
             <v-icon class="mr-2">mdi-information</v-icon>
             数据描述
           </v-card-title>
-          <v-card-text class="pa-6">
+          <v-card-text class="pa-4">
             <p class="text-body-1" style="line-height: 1.8">
               {{ dataset.description || "暂无描述" }}
             </p>
@@ -221,7 +221,7 @@ const pendingDatasetId = ref(null);
 const previewText = computed(() => previewLines.value.join("\n"));
 const ownerDisplay = computed(() => {
   if (!dataset.value) return "-";
-  return dataset.value.ownerName || dataset.value.owner_id || "-";
+  return dataset.value.owner_name || dataset.value.owner_id || "-";
 });
 
 // const breadcrumbs = computed(() => [

@@ -9,7 +9,7 @@
               >mdi-folder-account</v-icon
             >
             <div>
-              <h1 class="text-h4 font-weight-bold">我的数据</h1>
+              <h1 class="text-h4 font-weight-bold">数据管理</h1>
               <p class="text-subtitle-1 text-grey mb-0">管理您的数据集</p>
             </div>
           </div>
