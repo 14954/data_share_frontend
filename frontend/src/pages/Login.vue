@@ -136,7 +136,7 @@ async function register() {
     });
     await login();
   } catch (e) {
-    err.value = e?.response?.data?.message || "注册失败";
+    err.value = e?.response?.data?.details || e?.response?.data?.message || "注册失败";
   } finally {
     loading.value = false;
   }
@@ -156,7 +156,7 @@ async function login() {
     auth.setAuth(data.token, data.user);
     router.push("/main/market");
   } catch (e) {
-    err.value = e?.response?.data?.message || "登录失败";
+    err.value = e?.response?.data?.details || e?.response?.data?.message || "登录失败";
   } finally {
     loading.value = false;
   }

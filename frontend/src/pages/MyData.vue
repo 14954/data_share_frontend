@@ -430,8 +430,10 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { api } from "../api";
+import { useAuthStore } from "../store/auth";
 
 const APPROVE_PREF_KEY = "myData.shareApprove.s3.publicPrefs";
+const auth = useAuthStore();
 
 const owned = ref([]);
 const err = ref("");
@@ -564,6 +566,11 @@ function openApproveDialog(sharing) {
 
 async function confirmGenerateUrl() {
   if (!canSubmitApproval.value) return;
+  if (!pendingShare.value?.consumerPublicKey) {
+    err.value = "缺少共享发起者公钥，无法加密下载链接";
+    showError.value = true;
+    return;
+  }
   approveSubmitting.value = true;
   try {
     persistApprovePrefs();
@@ -576,6 +583,7 @@ async function confirmGenerateUrl() {
       session_token: approveSessionToken.value.trim(),
       region: approveRegion.value.trim(),
       endpoint: approveEndpoint.value.trim() || undefined,
+      consumerPublicKey: pendingShare.value.consumerPublicKey,
     });
     pendingShare.value.status = "approved";
     pendingShare.value.signedUrl = data?.signed_url || "";
@@ -690,6 +698,18 @@ function downloadBlob(data, fileName, contentType) {
   window.URL.revokeObjectURL(url);
 }
 
+async function decryptSignedUrl(encryptedValue) {
+  const username = auth.user?.username || "";
+  if (!username) {
+    throw new Error("缺少当前用户信息，无法解密 S3 下载链接");
+  }
+  const { data } = await api.post("/local/decrypt_url", {
+    username,
+    encryptedUrl: encryptedValue,
+  });
+  return data?.downloadUrl || "";
+}
+
 async function download(r) {
   err.value = "";
   downloading.value = true;
@@ -715,12 +735,15 @@ async function download(r) {
 
     const inlineSignedUrl = r?.signedUrl || r?.signed_url;
     if (inlineSignedUrl) {
-      window.open(inlineSignedUrl, "_blank", "noopener");
+      const downloadUrl = await decryptSignedUrl(inlineSignedUrl);
+      window.open(downloadUrl, "_blank", "noopener");
       return;
     }
 
     const { data } = await api.get(`/remote/datasets/${datasetId}/download-url`);
-    const downloadUrl = data?.downloadUrl;
+    const downloadUrl = data?.source === "s3"
+      ? await decryptSignedUrl(data?.downloadUrl)
+      : data?.downloadUrl;
     if (!downloadUrl) {
       throw new Error("下载链接无效");
     }
